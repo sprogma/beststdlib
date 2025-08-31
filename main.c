@@ -1,25 +1,16 @@
 #include "ms_string.h"
 
-char string[] = "A string\tof ,,tokens\nand some  more tokens   ";
-char seps[]   = " ,\t\n";
-char *token;
 
 int main( void )
 {
-   printf( "Tokens:\n" );
-
-   printf("%d\n", (int)ms_strlen("11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"));
-
-   // Establish string and get the first token:
-   token = ms_strtok( string, seps ); // C4996
-   // Note: strtok is deprecated; consider using strtok_s instead
-   int x = 0;
-   while( token != NULL && x++ < 100)
-   {
-      // While there are tokens in "string"
-      printf(">%s\n", token);
-
-      // Get next token:
-      token = ms_strtok( NULL, seps ); // C4996
-   }
+    {
+        const char *str = "abcabcabc";
+        const char *str_s = "abca";
+        printf("%s\nin\n%s\n=>\n%s\n", str, str_s, ms_strstr(str, str_s));
+    }
+    {
+        const char *str = "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111123111111111111";
+        const char *str_s = "123";
+        printf("%s\nin\n%s\n=>\n%s\n", str, str_s, ms_strstr(str, str_s));
+    }
 }

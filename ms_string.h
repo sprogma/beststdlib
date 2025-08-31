@@ -20,7 +20,6 @@ extern "C"
 
 
 
-#define ALIGN_BEFORE_RUN
 #define USE_GATHER_INSTRUCTION_IN_STRTOK
 
 
@@ -35,10 +34,6 @@ size_t ms_getline(char **lineptr, size_t *n, FILE *stream);
 char *ms_fgets(char *str, int count, FILE *stream);
 
 
-const char *ms_strstr(const char *str, const char *str_search);
-
-
-
 
 #define ALIGN_PAD(buf) (8 - (size_t)(buf) % 8)
 
@@ -47,14 +42,12 @@ MSLIB_EXPORT void ms_memclear(char *buf, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *buf_aligned = buf + ALIGN_PAD(buf);
-            while (buf < buf_aligned && *buf)
-            {
-                *buf++ = 0;
-                size--;
-            }
-        #endif
+        const char *buf_aligned = buf + ALIGN_PAD(buf);
+        while (buf < buf_aligned && *buf)
+        {
+            *buf++ = 0;
+            size--;
+        }
         size_t aligned_size = size & (~0x3F);
         while (aligned_size != 0)
         {
@@ -80,13 +73,11 @@ MSLIB_EXPORT char *ms_strend(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *dest_aligned = str + ALIGN_PAD(str);
-            while (str < dest_aligned && *str)
-            {
-                str++;
-            }
-        #endif
+        const char *dest_aligned = str + ALIGN_PAD(str);
+        while (str < dest_aligned && *str)
+        {
+            str++;
+        }
         uint32_t msk0, msk1;
         while (1)
         {
@@ -120,13 +111,11 @@ MSLIB_EXPORT char *ms_strcpy(char *dest, const char *src)
 {
     char *dest_start = dest;
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *dest_aligned = dest + ALIGN_PAD(dest);
-            while (dest < dest_aligned && *src)
-            {
-                *dest++ = *src++;
-            }
-        #endif
+        const char *dest_aligned = dest + ALIGN_PAD(dest);
+        while (dest < dest_aligned && *src)
+        {
+            *dest++ = *src++;
+        }
         while (1)
         {
             __m256i ymm0 = _mm256_loadu_si256((__m256i *)(src +  0));
@@ -161,14 +150,12 @@ MSLIB_EXPORT char *ms_memcpy(char *dest, const char *src, size_t size)
 {
     char *dest_start = dest;
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *dest_aligned = dest + ALIGN_PAD(dest);
-            while (dest < dest_aligned && size)
-            {
-                *dest++ = *src++;
-                --size;
-            }
-        #endif
+        const char *dest_aligned = dest + ALIGN_PAD(dest);
+        while (dest < dest_aligned && size)
+        {
+            *dest++ = *src++;
+            --size;
+        }
         size_t aligned_size = size & (~0x3F);
         while (aligned_size != 0)
         {
@@ -200,14 +187,12 @@ MSLIB_EXPORT char *ms_strncpy(char *dest, const char *src, size_t size)
 {
     char *dest_start = dest;
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *dest_aligned = dest + ALIGN_PAD(dest);
-            while (dest < dest_aligned && *src && size)
-            {
-                *dest++ = *src++;
-                --size;
-            }
-        #endif
+        const char *dest_aligned = dest + ALIGN_PAD(dest);
+        while (dest < dest_aligned && *src && size)
+        {
+            *dest++ = *src++;
+            --size;
+        }
         size_t aligned_size = size & (~0x3F);
         while (aligned_size != 0)
         {
@@ -273,13 +258,11 @@ MSLIB_EXPORT char *ms_strchr(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
     #ifdef __AVX2__
-        #ifdef ALIGN_BEFORE_RUN
-            const char *str_aligned = str + ALIGN_PAD(str);
-            while (str < str_aligned && *str && *str != ch)
-            {
-                str++;
-            }
-        #endif
+        const char *str_aligned = str + ALIGN_PAD(str);
+        while (str < str_aligned && *str && *str != ch)
+        {
+            str++;
+        }
         __m256i ymm0 = _mm256_set1_epi8(ch);
         uint32_t msk0, msk1, msk2, msk3;
         while (1)
@@ -339,13 +322,24 @@ MSLIB_EXPORT char *ms_strdup(const char *str)
 #endif
 
 
+#ifdef FORCE_INLINE
+    _Thread_local char *current_pos = NULL;
+    _Thread_local const char *prev_delimiters = NULL;
+    #if defined(__AVX2__) && defined(USE_GATHER_INSTRUCTION_IN_STRTOK)
+        _Thread_local uint32_t delimiters_table[256];
+    #endif
+#endif
 MSLIB_EXPORT char *ms_strtok(char *str, const char *delimiters)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {    
-    static char *current_pos = NULL;
-    static const char *prev_delimiters = NULL;
+    #ifndef FORCE_INLINE
+        _Thread_local static char *current_pos = NULL;
+        _Thread_local static const char *prev_delimiters = NULL;
+        #if defined(__AVX2__) && defined(USE_GATHER_INSTRUCTION_IN_STRTOK)
+            _Thread_local static uint32_t delimiters_table[256];
+        #endif
+    #endif
     #if defined(__AVX2__) && defined(USE_GATHER_INSTRUCTION_IN_STRTOK)
-        static uint32_t delimiters_table[256];
         if (prev_delimiters != delimiters)
         {
             ms_memclear((char *)delimiters_table, sizeof(delimiters_table));
@@ -377,54 +371,152 @@ MSLIB_EXPORT char *ms_strtok(char *str, const char *delimiters)
     {
         current_pos = str;
     } 
-    else if (current_pos == NULL || *current_pos == '\0') 
+    else if (current_pos == NULL || *current_pos == 0) 
     {
         return NULL;
     }
 
+    /* parsing delimiters, often short string i think? */
     #if defined(__AVX2__) && defined(USE_GATHER_INSTRUCTION_IN_STRTOK)
-        uint32_t msk0, msk1;
+    {
+        // TODO: unroll line to 64 byte fetch / parallel compuctation?
+        uint32_t mskz0, mskd0;
         while (1)
         {
-            __m256i ymm0 = _mm256_loadu_si256((__m256i *)(current_pos +  0));
-            ymm0 = _mm256_cvtepi8_epi32(ymm0);
-            __m256i ymm1 = _mm256_gather_epi32(ymm0);
-            msk0 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0));
-            msk1 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1));
-            if (msk0 | msk1)
+            __m128i xmm0 = _mm_loadu_si128((__m128i *)(current_pos));
+            __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
+            __m256i ymm1 = _mm256_i32gather_epi32(delimiters_table, ymm0, 4);
+            mskz0 = _mm256_movemask_epi8(_mm256_cmpeq_epi32(ymm0, _mm256_setzero_si256()));
+            mskd0 = ~_mm256_movemask_epi8(ymm1);
+            if (mskd0 | mskz0)
             {
                 break;
             }
-            current_pos += 64;
+            current_pos += 8;
         }
-        current_pos += _tzcnt_u64((size_t)msk0 | ((size_t)msk1 << 32ull));
+        current_pos += _tzcnt_u32(mskz0 | mskd0) / 4;
+    }
     #else
-        while (*current_pos != '\0' && delimiters_table[(unsigned char)*current_pos]) 
+        while (*current_pos != 0 && delimiters_table[(unsigned char)*current_pos]) 
         {
             current_pos++;
         }
     #endif
 
     // If we've reached the end of the string after skipping delimiters
-    if (*current_pos == '\0') 
+    if (*current_pos == 0) 
     {
         return NULL;
     }
 
     char *token_start = current_pos;
 
-    // Find the end of the token
-    while (*current_pos != '\0' && !delimiters_table[(unsigned char)*current_pos]) 
+    /* parsing token, often longer string i think? */
+    #if defined(__AVX2__) && defined(USE_GATHER_INSTRUCTION_IN_STRTOK)
     {
-        current_pos++;
+        // TODO: unroll line to 64 byte fetch / parallel compuctation?
+        uint32_t mskz0, mskd0;
+        while (1)
+        {
+            __m128i xmm0 = _mm_loadu_si128((__m128i *)(current_pos));
+            __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
+            __m256i ymm1 = _mm256_i32gather_epi32(delimiters_table, ymm0, 4);
+            mskz0 = _mm256_movemask_epi8(_mm256_cmpeq_epi32(ymm0, _mm256_setzero_si256()));
+            mskd0 = _mm256_movemask_epi8(ymm1);
+            if (mskd0 | mskz0)
+            {
+                break;
+            }
+            current_pos += 8;
+        }
+        current_pos += _tzcnt_u32(mskz0 | mskd0) / 4;
     }
+    #else
+        while (*current_pos != 0 && !delimiters_table[(unsigned char)*current_pos]) 
+        {
+            current_pos++;
+        }
+    #endif
 
-    if (*current_pos != '\0') 
+    // TODO: See, does this check not slow down code?
+    if (*current_pos != 0) 
     {
-        *current_pos++ = '\0';
+        *current_pos++ = 0;
     }
 
     return token_start;
+}
+#else
+;
+#endif
+
+
+/* internal functions */
+
+#ifdef __AVX2__
+MSLIB_EXPORT const char *_ms_strstr_search_32_chars(const char *str, __m256i search, size_t length)
+{
+    /* load two aligned blocks : current and next */
+    const char *aligned = (const char *)((uintptr_t)str & 0x1F);
+    __m256i ymm0, ymm1;
+
+    #define SHIFT()
+    
+    /* load blocks? */
+    ymm0 = _mm256_loadu_si256((__m256i *)(str +  0));
+    ymm1 = _mm256_loadu_si256((__m256i *)(str + 32));
+    
+    int i = str - aligned;
+    for (; str[length]; ++i)
+    {
+        
+    }
+    return NULL;
+}
+#endif
+
+MSLIB_EXPORT const char *ms_strstr(const char *str, const char *str_search)
+#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+{
+    if (*str_search == 0)
+    {
+        return str;
+    }
+    if (str_search[1] == 0)
+    {
+        return ms_strchr(str, *str_search);
+    }
+    /* length of str_search <= 32 */
+    #ifdef __AVX2__
+    {
+        /* ! really unaligned load */
+        __m256i ymm0 = _mm256_loadu_si256((__m256i *)str_search);
+        uint32_t msk = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256()));
+        if (msk || str_search[32] == 0)
+        {
+            return _ms_strstr_search_32_chars(str, ymm0, _tzcnt_u32(msk));
+        }
+    }
+    #endif
+
+    /* naive algo */
+    while (*str != 0)
+    {
+        /* match */
+        const char *match = str;
+        while (*str_search && *match && *match == *str_search)
+        {
+            match++;
+            str_search++;
+        }
+        if (*str_search == 0)
+        {
+            return str;
+        }
+        str++;
+    }
+    
+    return NULL;
 }
 #else
 ;
