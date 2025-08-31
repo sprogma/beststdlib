@@ -21,6 +21,7 @@ extern "C"
 
 
 #define USE_GATHER_INSTRUCTION_IN_STRTOK
+#define USE_MANY_LOADING_IN_STRSTR_32
 
 
 
@@ -310,8 +311,6 @@ MSLIB_EXPORT size_t ms_strlen(const char *str)
 MSLIB_EXPORT char *ms_strdup(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
-    #ifdef __WIN32
-    #endif
     int size = ms_strlen(str) + 1;
     char *new_string = malloc(size);
     ms_memcpy(new_string, str, size);
@@ -460,17 +459,50 @@ MSLIB_EXPORT const char *_ms_strstr_search_32_chars(const char *str, __m256i sea
     const char *aligned = (const char *)((uintptr_t)str & 0x1F);
     __m256i ymm0, ymm1;
 
-    #define SHIFT()
-    
-    /* load blocks? */
-    ymm0 = _mm256_loadu_si256((__m256i *)(str +  0));
-    ymm1 = _mm256_loadu_si256((__m256i *)(str + 32));
-    
-    int i = str - aligned;
-    for (; str[length]; ++i)
+    #ifdef USE_MANY_LOADING_IN_STRSTR_32    
+        const __m256i reverse_shuffle = _mm256_set_epi8(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
+        const __m256i blend_mask = _mm256_setr_epi8(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0xFF);
+        #define SHIFTL(ymm) \
+            ymm = _mm256_alignr_epi8(_mm256_permute2x128_si256(ymm, ymm, _MM_SHUFFLE(2, 0, 0, 1)), ymm, 1)
+        #define SHIFTR(ymm) \
+            ymm = _mm256_alignr_epi8(ymm, _mm256_permute2x128_si256(ymm, ymm, _MM_SHUFFLE(0, 0, 2, 0)), 15)
+        #define REVERSE(ymm) \
+            ymm = _mm256_permute4x64_epi64(_mm256_shuffle_epi8(ymm, reverse_shuffle), _MM_SHUFFLE(1, 0, 3, 2));
+            
+        ymm0 = _mm256_loadu_si256((__m256i *)(str +  0));
+        ymm1 = _mm256_loadu_si256((__m256i *)(str + 32));
+        REVERSE(ymm1);
+
+        // printf(">%s : %s\n", str);
+        SHIFTL(ymm0);
+        ymm0 = _mm256_blendv_epi8(ymm0, ymm1, blend_mask);
+        // _mm256_storeu_si256((__m256i *)str, ymm0);
+        SHIFTR(ymm1);
+        // printf(">%s\n", str);
+    #else
+    #endif
+
+    char str_search_buf[33] = {}, *str_search = str_search_buf;
+    _mm256_storeu_si256((__m256i *)str_search, search);
+
+    /* naive algo */
+    while (*str != 0)
     {
-        
+        /* match */
+        const char *match = str;
+        str_search = str_search_buf;
+        while (*str_search && *match && *match == *str_search)
+        {
+            match++;
+            str_search++;
+        }
+        if (*str_search == 0)
+        {
+            return str;
+        }
+        str++;
     }
+    
     return NULL;
 }
 #endif
@@ -489,20 +521,27 @@ MSLIB_EXPORT const char *ms_strstr(const char *str, const char *str_search)
     /* length of str_search <= 32 */
     #ifdef __AVX2__
     {
-        /* ! really unaligned load */
-        __m256i ymm0 = _mm256_loadu_si256((__m256i *)str_search);
-        uint32_t msk = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256()));
-        if (msk || str_search[32] == 0)
+        /* check str_search 32 bits: */
+        char buf[32] = {};
+        size_t search_length = 0;
+        while (search_length <= 32 && str_search[search_length])
         {
-            return _ms_strstr_search_32_chars(str, ymm0, _tzcnt_u32(msk));
+            buf[search_length] = str_search[search_length];
+            search_length++;
+        }
+        __m256i search_ymm = _mm256_loadu_si256((__m256i *)buf);
+        if (search_length <= 32)
+        {
+            return _ms_strstr_search_32_chars(str, search_ymm, search_length);
         }
     }
     #endif
-
     /* naive algo */
+    const char *str_search_start = str_search;
     while (*str != 0)
     {
         /* match */
+        str_search = str_search_start;
         const char *match = str;
         while (*str_search && *match && *match == *str_search)
         {
