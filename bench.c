@@ -1,7 +1,11 @@
+#include "time.h"
 #include "string.h"
 #include "ms_string.h"
-#include "windows.h"
-#include "realtimeapiset.h"
+
+#ifdef WIN32
+    #include "windows.h"
+    #include "realtimeapiset.h"
+#endif
 
 #include "setjmp.h"
 #include "signal.h"
@@ -13,10 +17,12 @@
 #define SHOW_LITTLE_TIME_IN_MICROSECONDS
 #define USE_LOG_SCALE_IN_GISTOGRAM
 
+// #define RUN_WARMUP_GLOBAL_SCALE 1
 // #define RUN_MEASURES_GLOBAL_SCALE 1
 #define RUN_WARMUP_GLOBAL_SCALE 2
 #define RUN_MEASURES_GLOBAL_SCALE 2
 
+/* not works on linux */
 // #define MIN_INSTEAD_OF_MEAN
 
 
@@ -39,10 +45,14 @@
         option_names[option_id] = string; \
     } \
     for(;current_option == NULL && !option_completed[option_id];current_option = string, option_completed[option_id] = 1)
-#ifdef MIN_INSTEAD_OF_MEAN
-    #define RESET_COUNTER bestbench_counter_total = 0x7fffffffffffffffll;
+#ifdef WIN32
+    #ifdef MIN_INSTEAD_OF_MEAN
+        #define RESET_COUNTER bestbench_counter_total = 0x7fffffffffffffffll;
+    #else
+        #define RESET_COUNTER bestbench_counter_total = 0;
+    #endif
 #else
-    #define RESET_COUNTER bestbench_counter_total = 0;
+    #define RESET_COUNTER bestbench_counter_total = 0.0;
 #endif
 #define BENCH_VARIANT(string) \
     variant_id++; \
@@ -56,35 +66,54 @@
 #define BENCH_RUN(warm, measure) \
             for (bench_run = -RUN_WARMUP_GLOBAL_SCALE * (warm); bench_run < RUN_MEASURES_GLOBAL_SCALE * (measure); ++bench_run)
 #ifdef MIN_INSTEAD_OF_MEAN
-    #define BENCH_START \
-                if (bench_run >= 0) \
-                { \
-                    QueryPerformanceCounter(&bestbench_counter_storage); \
-                    bestbench_counter = -bestbench_counter_storage.QuadPart; \
-                }
-    #define BENCH_END \
-                if (bench_run >= 0) \
-                { \
-                    QueryPerformanceCounter(&bestbench_counter_storage); \
-                    bestbench_counter += bestbench_counter_storage.QuadPart; \
-                    if (bestbench_counter_total > bestbench_counter) \
+    #ifdef WIN32
+        #define BENCH_START \
+                    if (bench_run >= 0) \
                     { \
-                        bestbench_counter_total = bestbench_counter; \
-                    } \
-                }
+                        QueryPerformanceCounter(&bestbench_counter_storage); \
+                        bestbench_counter = -bestbench_counter_storage.QuadPart; \
+                    }
+        #define BENCH_END \
+                    if (bench_run >= 0) \
+                    { \
+                        QueryPerformanceCounter(&bestbench_counter_storage); \
+                        bestbench_counter += bestbench_counter_storage.QuadPart; \
+                        if (bestbench_counter_total > bestbench_counter) \
+                        { \
+                            bestbench_counter_total = bestbench_counter; \
+                        } \
+                    }
+    #else
+        #error cannot use min instead of mean on linux
+    #endif
 #else
-    #define BENCH_START \
-                if (bench_run >= 0) \
-                { \
-                    QueryPerformanceCounter(&bestbench_counter_storage); \
-                    bestbench_counter_total -= bestbench_counter_storage.QuadPart; \
-                }
-    #define BENCH_END \
-                if (bench_run >= 0) \
-                { \
-                    QueryPerformanceCounter(&bestbench_counter_storage); \
-                    bestbench_counter_total += bestbench_counter_storage.QuadPart; \
-                }
+    #ifdef WIN32
+        #define BENCH_START \
+                    if (bench_run >= 0) \
+                    { \
+                        QueryPerformanceCounter(&bestbench_counter_storage); \
+                        bestbench_counter_total -= bestbench_counter_storage.QuadPart; \
+                    }
+        #define BENCH_END \
+                    if (bench_run >= 0) \
+                    { \
+                        QueryPerformanceCounter(&bestbench_counter_storage); \
+                        bestbench_counter_total += bestbench_counter_storage.QuadPart; \
+                    }
+    #else
+        #define BENCH_START \
+                    if (bench_run >= 0) \
+                    { \
+                        clock_gettime(CLOCK_MONOTONIC, &bestbench_counter_storage); \
+                        bestbench_counter_total -= (double)bestbench_counter_storage.tv_sec + (double)bestbench_counter_storage.tv_nsec / 1e9; \
+                    }
+        #define BENCH_END \
+                    if (bench_run >= 0) \
+                    { \
+                        clock_gettime(CLOCK_MONOTONIC, &bestbench_counter_storage); \
+                        bestbench_counter_total += (double)bestbench_counter_storage.tv_sec + (double)bestbench_counter_storage.tv_nsec / 1e9; \
+                    }
+    #endif
 #endif
 
 int option_id = 0;
@@ -92,15 +121,20 @@ int variant_id = 0;
 int bench_run = 0;
 const char *current_variant = NULL;
 const char *current_option = NULL;
-const char *option_names[32] = {};
-const char *variant_names[32] = {};
+const char *option_names[64] = {};
+const char *variant_names[64] = {};
 /* variant option */
-double measurements[32][32] = {};
-int option_completed[32] = {};
-int variant_completed[32] = {};
-LARGE_INTEGER bestbench_counter_storage;
+double measurements[64][64] = {};
+int option_completed[64] = {};
+int variant_completed[64] = {};
 long long bestbench_counter = 0;
-long long bestbench_counter_total = 0;
+#ifdef WIN32
+    LARGE_INTEGER bestbench_counter_storage;
+    long long bestbench_counter_total = 0;
+#else
+    struct timespec bestbench_counter_storage;
+    double bestbench_counter_total = 0;
+#endif
 volatile int do_not_optimize = 0;
 // use longjmp to return index of table there is current option and variant
 
@@ -111,9 +145,9 @@ BENCH(strlen)
     BENCH_OPTION("n=1")      { n = 1; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     char *s = calloc(n, 1);
     if (n != 1)
     {
@@ -157,9 +191,9 @@ BENCH(memcpy)
     BENCH_OPTION("n=1")      { n = 1; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     char *s = calloc(n, 1);
     char *d = calloc(n, 1);
     if (n != 1)
@@ -174,6 +208,7 @@ BENCH(memcpy)
             memcpy(d, s, n);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
     }
@@ -185,6 +220,7 @@ BENCH(memcpy)
             ms_memcpy_avx2_d32(d, s, n);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
     }
@@ -196,6 +232,7 @@ BENCH(memcpy)
             ms_memcpy_avx2_d64(d, s, n);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
     }
@@ -207,9 +244,9 @@ BENCH(strcpy)
     BENCH_OPTION("n=1")      { n = 1; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     char *s = calloc(n, 1);
     char *d = calloc(n, 1);
     if (n != 1)
@@ -224,6 +261,7 @@ BENCH(strcpy)
             strcpy(d, s);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
     }
@@ -235,6 +273,7 @@ BENCH(strcpy)
             ms_strcpy_avx2_d32(d, s);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
     }
@@ -246,8 +285,135 @@ BENCH(strcpy)
             ms_strcpy_avx2_d64(d, s);
             BENCH_END
         }
+        do_not_optimize += d[n - 1];
         free(s);
         free(d);
+    }
+}
+
+void fill_strtok(char *s, int n, int step, int delim, const char *delimiters)
+{
+    int delim_id = 0;
+    
+    {
+        int pos = 0;
+        int now = 0;
+        int len = step; 
+        while (pos < n)
+        {
+            len--;
+            if (now == 0)
+            {
+                s[pos++] = ' ';
+                if (len == 0)
+                {
+                    len = delim;
+                    now = 1;
+                }
+            }
+            else
+            {
+                s[pos++] = delimiters[delim_id++];
+                if (delimiters[delim_id] == 0)
+                {
+                    delim_id = 0;
+                }
+                if (len == 0)
+                {
+                    len = step;
+                    now = 0;
+                }
+            }
+        }
+        s[pos++] = 0;
+    }
+}
+
+BENCH(strtok)
+{
+    int n, sep, step, delim = 1;
+    BENCH_OPTION("n=10 sep=1")        { n = 10; sep = 0; step = 5; }
+    BENCH_OPTION("n=10 sep=2")        { n = 10; sep = 1; step = 5; }
+    BENCH_OPTION("n=10 sep=64")       { n = 10; sep = 2; step = 5; }
+    BENCH_OPTION("n=1e3 sep=1")      { n = 1000; sep = 0; step = 50; }
+    BENCH_OPTION("n=1e3 sep=64")     { n = 1000; sep = 2; step = 50; }
+    BENCH_OPTION("n=1e5 sep=1")    { n = 1000; sep = 0; step = 100; }
+    BENCH_OPTION("n=1e5 sep=64")   { n = 1000; sep = 2; step = 100; }
+    BENCH_OPTION("n=1e7/100/1 sep=1")  { n = 10000000; sep = 0; step = 100; }
+    BENCH_OPTION("n=1e7/100/1 sep=2")  { n = 10000000; sep = 1; step = 100; }
+    BENCH_OPTION("n=1e7/100/1 sep=64") { n = 10000000; sep = 2; step = 100; }
+    BENCH_OPTION("n=1e7/1e4/1 sep=1")  { n = 10000000; sep = 0; step = 10000; }
+    BENCH_OPTION("n=1e7/1e4/1 sep=2")  { n = 10000000; sep = 1; step = 10000; }
+    BENCH_OPTION("n=1e7/1e4/1 sep=64") { n = 10000000; sep = 2; step = 10000; }
+    BENCH_OPTION("n=1e7/1e3/1e3 sep=1")  { n = 10000000; sep = 0; step = 1000; delim = 1000; }
+    BENCH_OPTION("n=1e7/1e3/1e3 sep=2")  { n = 10000000; sep = 1; step = 1000; delim = 1000; }
+    BENCH_OPTION("n=1e7/1e3/1e3 sep=64") { n = 10000000; sep = 2; step = 1000; delim = 1000; }
+
+    const char *delimiters;
+    if (sep == 0)
+    {
+        delimiters = "a";
+    }
+    else if (sep == 1)
+    {
+        delimiters = "az";
+    }
+    else
+    {
+        delimiters = "!#%')+-/13579;=?ACEGIKMOQSUWY[]_acegikmoqsuwy{}";
+    }
+    char *s = malloc(n + 1);
+    
+    BENCH_VARIANT("gnu lib")
+    {
+        BENCH_RUN(4, 16)
+        {
+            fill_strtok(s, n, step, delim, delimiters);
+            
+            BENCH_START
+            char *token = strtok(s, delimiters);
+            while (token != NULL) 
+            {
+                token = strtok(NULL, delimiters);
+            }
+            BENCH_END
+        }
+        do_not_optimize += s[n - 1];
+        free(s);
+    }
+    BENCH_VARIANT("MS lib gather")
+    {
+        BENCH_RUN(4, 16)
+        {
+            fill_strtok(s, n, step, delim, delimiters);
+            
+            BENCH_START
+            char *token = ms_strtok_avx2_gather(s, delimiters);
+            while (token != NULL) 
+            {
+                token = ms_strtok_avx2_gather(NULL, delimiters);
+            }
+            BENCH_END
+        }
+        do_not_optimize += s[n - 1];
+        free(s);
+    }
+    BENCH_VARIANT("MS lib base")
+    {
+        BENCH_RUN(4, 16)
+        {
+            fill_strtok(s, n, step, delim, delimiters);
+            
+            BENCH_START
+            char *token = ms_strtok_x64(s, delimiters);
+            while (token != NULL) 
+            {
+                token = ms_strtok_x64(NULL, delimiters);
+            }
+            BENCH_END
+        }
+        do_not_optimize += s[n - 1];
+        free(s);
     }
 }
 
@@ -257,9 +423,9 @@ BENCH(strdup)
     BENCH_OPTION("n=1")      { n = 1; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     char *s = calloc(n, 1);
     char *d = NULL;
     if (n != 1)
@@ -297,9 +463,9 @@ BENCH(strcat)
     BENCH_OPTION("n=2")      { n = 2; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     BENCH_VARIANT("gnu lib")
     {
         BENCH_RUN(32, 256)
@@ -363,9 +529,9 @@ BENCH(puts)
     BENCH_OPTION("n=2")      { n = 2; }
     BENCH_OPTION("n=10")     { n = 10; }
     BENCH_OPTION("n=100")    { n = 100; }
-    BENCH_OPTION("n=1000")   { n = 1000; }
-    BENCH_OPTION("n=100000")  { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")    { n = 1000; }
+    BENCH_OPTION("n=1e5")    { n = 100000; }
+    BENCH_OPTION("n=1e7")    { n = 10000000; }
     char *s = calloc(n, 1);
     if (n != 1)
     {
@@ -400,9 +566,9 @@ BENCH(atoi)
     BENCH_OPTION("no_spaces")  { n = 0; }
     BENCH_OPTION("n=10")       { n = 10; }
     BENCH_OPTION("n=100")      { n = 100; }
-    BENCH_OPTION("n=1000")     { n = 1000; }
-    BENCH_OPTION("n=100000")   { n = 100000; }
-    BENCH_OPTION("n=10000000") { n = 10000000; }
+    BENCH_OPTION("n=1e3")      { n = 1000; }
+    BENCH_OPTION("n=1e5")      { n = 100000; }
+    BENCH_OPTION("n=1e7")      { n = 10000000; }
     char *s;
     if (n == 0)
     {
@@ -438,7 +604,11 @@ BENCH(atoi)
     }
 }
 
+#ifdef WIN32
 jmp_buf buf;
+#else
+sigjmp_buf buf;
+#endif
 
 void handler(int sig)
 {
@@ -451,8 +621,12 @@ void handler(int sig)
         }
         else
         {
-            QueryPerformanceFrequency(&bestbench_counter_storage);
-            measurements[variant_id][option_id] = (double)bestbench_counter_total / (double)bestbench_counter_storage.QuadPart
+            #ifdef WIN32
+                QueryPerformanceFrequency(&bestbench_counter_storage);
+                measurements[variant_id][option_id] = (double)bestbench_counter_total / (double)bestbench_counter_storage.QuadPart
+            #else
+                measurements[variant_id][option_id] = bestbench_counter_total
+            #endif
             #ifdef MIN_INSTEAD_OF_MEAN
                 ;
             #else
@@ -461,7 +635,11 @@ void handler(int sig)
             bestbench_counter = 0;
         }
         option_id = 0;
+        #ifdef WIN32
         longjmp(buf, 0);
+        #else
+        siglongjmp(buf, 0);
+        #endif
     }
 }
 
@@ -469,14 +647,26 @@ void handler(int sig)
 
 void complete_benchmark(void (*fn)(), const char *testing_name)
 {
+    memset(option_names, 0, sizeof(option_names));
+    memset(variant_names, 0, sizeof(variant_names));
     memset(option_completed, 0, sizeof(option_completed));
     memset(variant_completed, 0, sizeof(variant_completed));
+    memset(measurements, 0, sizeof(measurements));
     option_id = 0;
     variant_id = 0;
-    
+
+    #ifdef WIN32
     int result = setjmp(buf);
+    #else
+    int result = sigsetjmp(buf, 1);
+    #endif
     (void)result;
-    signal(SIGABRT, &handler);
+    
+    if (signal(SIGABRT, &handler) == SIG_ERR)
+    {
+        printf("ERROR: cannot set handler on SIGABRT\n");
+        exit(1);
+    }
     
     fn();
 
@@ -533,7 +723,8 @@ set grid ytics linestyle 1
 
 set key inside right top vertical
 
-set xtic rotate by 0 scale 0
+set xtics rotate by -90
+# set xtic rotate by 0 scale 0
 
 plot 'data.csv' using 2:xtic(1) title columnheader(2), \
         )code");
@@ -612,15 +803,16 @@ int main( void )
         complete_benchmark(wrapper_strlen, "strlen");
         complete_benchmark(wrapper_memcpy, "memcpy");
         complete_benchmark(wrapper_strcpy, "strcpy");
-        complete_benchmark(wrapper_strcpy, "strdup");
         complete_benchmark(wrapper_strcat, "strcat");
+        complete_benchmark(wrapper_strtok, "strtok");
+        complete_benchmark(wrapper_strcpy, "strdup");
     }
     if (0)
     {
         /* io functions */
         complete_benchmark(wrapper_puts, "puts");
     }
-    if (0)
+    if (1)
     {
         /* convertion functions */
         complete_benchmark(wrapper_atoi, "atoi");

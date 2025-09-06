@@ -22,7 +22,7 @@ extern "C"
 
 
 #ifdef FORCE_INLINE
-    #define MSLIB_EXPORT __attribute__((always_inline)) __inline__
+    #define MSLIB_EXPORT static __attribute__((always_inline)) __inline__
 #else
     #define MSLIB_EXPORT
 #endif
@@ -39,6 +39,7 @@ extern "C"
 #define USE_32_STEP_STRNCPY
 #define USE_32_STEP_STRCHR
 
+// #define STRTOK_DYNAMIC_DELIMITERS
 
 
 /*
@@ -63,9 +64,9 @@ extern "C"
 
 
 
-#define ALIGN_PAD8(buf)  ( 8 - (size_t)(buf) %  8)
-#define ALIGN_PAD32(buf) (32 - (size_t)(buf) % 32)
-#define ALIGN_PAD64(buf) (64 - (size_t)(buf) % 64)
+#define ALIGN_PAD8(buf)  (( 8 - (size_t)(buf) %  8) % 8 )
+#define ALIGN_PAD32(buf) ((32 - (size_t)(buf) % 32) % 32)
+#define ALIGN_PAD64(buf) ((64 - (size_t)(buf) % 64) % 64)
 
 
 
@@ -891,7 +892,7 @@ MSLIB_EXPORT char *ms_strncat(char * __restrict__ dest, const char * __restrict_
         like strend, but check both zero and given char
 */
 #ifdef __AVX2__
-MSLIB_EXPORT char *ms_strchr_avx2_d32(const char *str, int ch)
+MSLIB_EXPORT char *ms_strchr_ptr_avx2_d32(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
     const char *str_aligned = str + ALIGN_PAD32(str);
@@ -903,7 +904,7 @@ MSLIB_EXPORT char *ms_strchr_avx2_d32(const char *str, int ch)
 
     if (*str == 0 || *str == ch)
     {
-        return (!*str && ch ? NULL : (char *)str);
+        return (char *)str;
     }
 
     __m256i ymm0 = _mm256_set1_epi8(ch);
@@ -916,7 +917,7 @@ MSLIB_EXPORT char *ms_strchr_avx2_d32(const char *str, int ch)
         if (msk0 | msk1)
         {
             str += _tzcnt_u32(msk0 | msk1);
-            return (!*str && ch ? NULL : (char *)str);
+            return (char *)str;
         }
         str += 32;
     }
@@ -926,7 +927,7 @@ MSLIB_EXPORT char *ms_strchr_avx2_d32(const char *str, int ch)
 #endif
 
 
-MSLIB_EXPORT char *ms_strchr_avx2_d64(const char *str, int ch)
+MSLIB_EXPORT char *ms_strchr_ptr_avx2_d64(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
     const char *str_aligned = str + ALIGN_PAD64(str);
@@ -938,7 +939,7 @@ MSLIB_EXPORT char *ms_strchr_avx2_d64(const char *str, int ch)
 
     if (*str == 0 || *str == ch)
     {
-        return (!*str && ch ? NULL : (char *)str);
+        return (char *)str;
     }
 
     __m256i ymm0 = _mm256_set1_epi8(ch);
@@ -954,7 +955,106 @@ MSLIB_EXPORT char *ms_strchr_avx2_d64(const char *str, int ch)
         if (msk0 | msk1 | msk2 | msk3)
         {
             str += _tzcnt_u64((size_t)(msk0 | msk2) | ((size_t)(msk1 | msk3) << 32ull));
-            return (!*str && ch ? NULL : (char *)str);
+            return (char *)str;
+        }
+        str += 64;
+    }
+}
+#else
+;
+#endif
+#endif
+
+MSLIB_EXPORT char *ms_strchr_ptr_x64(const char *str, int ch)
+#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+{
+    while (*str && *str != ch)
+    {
+        str++;
+    }
+    return (char *)str; 
+}
+#else
+;
+#endif
+
+
+#ifdef __AVX2__
+    #ifdef USE_32_STEP_STRCHR
+        #define ms_strchr_ptr(str, ch) ms_strchr_ptr_avx2_d32(str, ch)
+    #else
+        #define ms_strchr_ptr(str, ch) ms_strchr_ptr_avx2_d64(str, ch)
+    #endif
+#else
+    #define ms_strchr_ptr(str, ch) ms_strchr_ptr_x64(str, ch)
+#endif
+
+
+#ifdef __AVX2__
+MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d32(const char *str, int ch)
+#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+{
+    const char *str_aligned = str + ALIGN_PAD32(str);
+
+    while (str < str_aligned && *str && *str == ch)
+    {
+        str++;
+    }
+
+    if (*str == 0 || *str != ch)
+    {
+        return (char *)str;
+    }
+
+    __m256i ymm0 = _mm256_set1_epi8(ch);
+
+    while (1)
+    {
+        __m256i ymm1 = _mm256_loadu_si256((__m256i *)(str +  0));
+        uint32_t msk0 = ~_mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1, ymm0));
+        uint32_t msk1 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1, _mm256_setzero_si256()));
+        if (msk0 | msk1)
+        {
+            str += _tzcnt_u32(msk0 | msk1);
+            return (char *)str;
+        }
+        str += 32;
+    }
+}
+#else
+;
+#endif
+
+
+MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d64(const char *str, int ch)
+#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+{
+    const char *str_aligned = str + ALIGN_PAD64(str);
+
+    while (str < str_aligned && *str && *str == ch)
+    {
+        str++;
+    }
+
+    if (*str == 0 || *str != ch)
+    {
+        return (char *)str;
+    }
+
+    __m256i ymm0 = _mm256_set1_epi8(ch);
+
+    while (1)
+    {
+        __m256i ymm1 = _mm256_loadu_si256((__m256i *)(str +  0));
+        __m256i ymm2 = _mm256_loadu_si256((__m256i *)(str + 32));
+        uint32_t msk0 = ~_mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1, ymm0));
+        uint32_t msk1 = ~_mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm2, ymm0));
+        uint32_t msk2 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1, _mm256_setzero_si256()));
+        uint32_t msk3 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm2, _mm256_setzero_si256()));
+        if (msk0 | msk1 | msk2 | msk3)
+        {
+            str += _tzcnt_u64((size_t)(msk0 | msk2) | ((size_t)(msk1 | msk3) << 32ull));
+            return (char *)str;
         }
         str += 64;
     }
@@ -965,14 +1065,14 @@ MSLIB_EXPORT char *ms_strchr_avx2_d64(const char *str, int ch)
 #endif
 
 
-MSLIB_EXPORT char *ms_strchr_x64(const char *str, int ch)
+MSLIB_EXPORT char *ms_inv_strchr_ptr_x64(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
-    while (*str && *str != ch)
+    while (*str && *str == ch)
     {
         str++;
     }
-    return (!*str && ch ? NULL : (char *)str);
+    return (char *)str; 
 }
 #else
 ;
@@ -983,14 +1083,25 @@ MSLIB_EXPORT char *ms_strchr_x64(const char *str, int ch)
 
 #ifdef __AVX2__
     #ifdef USE_32_STEP_STRCHR
-        #define ms_strchr(str, ch) ms_strchr_avx2_d32(str, ch)
+        #define ms_inv_strchr_ptr(str, ch) ms_inv_strchr_ptr_avx2_d32(str, ch)
     #else
-        #define ms_strchr(str, ch) ms_strchr_avx2_d64(str, ch)
+        #define ms_inv_strchr_ptr(str, ch) ms_inv_strchr_ptr_avx2_d64(str, ch)
     #endif
 #else
-    #define ms_strchr(str, ch) ms_strchr_x64(str, ch)
+    #define ms_inv_strchr_ptr(str, ch) ms_inv_strchr_ptr_x64(str, ch)
 #endif
 
+
+
+MSLIB_EXPORT char *ms_strchr(const char *str, char ch)
+#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+{
+    str = ms_strchr_ptr(str, ch);
+    return (!*str && ch) ? NULL : (char *)str;
+}
+#else
+;
+#endif
 
 
 
@@ -1145,37 +1256,35 @@ MSLIB_EXPORT char *ms_fgets(char * __restrict__ str, size_t count, FILE * __rest
         
         make 2 searches - first to skip delimiters, second - to find next delimiter
 
+        if delimiter is one - fall to strchr.
+
 */
 #ifdef __AVX2__
-#ifdef FORCE_INLINE
-    extern _Thread_local char *avx2_gather_current_pos = NULL;
-    extern _Thread_local const char *avx2_gather_prev_delimiters = NULL;
-    extern _Thread_local uint32_t avx2_gather_delimiters_table[256];
-#endif
+static _Thread_local char *avx2_gather_current_pos = NULL;
+static _Thread_local uint32_t avx2_gather_delimiters_table[256];
+static _Thread_local uint32_t avx2_gather_ms_strtok_use_strchr = 0;
 MSLIB_EXPORT char *ms_strtok_avx2_gather(char * __restrict__ str, const char * __restrict__ delimiters)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
-{    
-    #ifndef FORCE_INLINE
-        _Thread_local static char *avx2_gather_current_pos = NULL;
-        _Thread_local static const char *avx2_gather_prev_delimiters = NULL;
-        _Thread_local static uint32_t avx2_gather_delimiters_table[256];
+{  
+    #ifndef STRTOK_DYNAMIC_DELIMITERS
+    if (str != NULL)
     #endif
-
-    if (avx2_gather_prev_delimiters != delimiters)
     {
-        ms_memclear((char *)avx2_gather_delimiters_table, sizeof(avx2_gather_delimiters_table));
-
-        avx2_gather_delimiters_table[0] = -1;
-
-        avx2_gather_prev_delimiters = delimiters;
-        while (*delimiters)
+        if (delimiters[1] != 0)
         {
-            avx2_gather_delimiters_table[(unsigned char)*delimiters] = -1;
-            delimiters++;
-        }
-        delimiters = avx2_gather_prev_delimiters;
-    }
+            ms_memclear((char *)avx2_gather_delimiters_table, sizeof(avx2_gather_delimiters_table));
 
+            avx2_gather_delimiters_table[0] = -1;
+
+            const char *save = delimiters;
+            while (*delimiters)
+            {
+                avx2_gather_delimiters_table[(unsigned char)*delimiters] = -1;
+                delimiters++;
+            }
+            delimiters = save;
+        }
+    }
     if (str != NULL) 
     {
         avx2_gather_current_pos = str;
@@ -1186,32 +1295,42 @@ MSLIB_EXPORT char *ms_strtok_avx2_gather(char * __restrict__ str, const char * _
         return NULL;
     }
 
-    /* align position */
+    if (delimiters[1] == 0)
     {
-        const char *aligned_pos = avx2_gather_current_pos + ALIGN_PAD8(avx2_gather_current_pos);
-
-        while (avx2_gather_current_pos < aligned_pos && 
-              *avx2_gather_current_pos != 0 && 
-               avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos]) 
-        {
-            avx2_gather_current_pos++;
-        }
+        avx2_gather_current_pos = ms_inv_strchr_ptr(avx2_gather_current_pos, *delimiters);
     }
-
-    // TODO: unroll line to 64 byte fetch / parallel compuctation?
-    while (1)
+    else
     {
-        __m128i xmm0 = _mm_cvtsi64_si128(*(__int64 *)(avx2_gather_current_pos));
-        __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
-        __m256i ymm1 = _mm256_i32gather_epi32(avx2_gather_delimiters_table, ymm0, 4);
-        uint32_t mskz0 = _mm256_movemask_epi8(_mm256_cmpeq_epi32(ymm0, _mm256_setzero_si256()));
-        uint32_t mskd0 = ~_mm256_movemask_epi8(ymm1);
-        if (mskd0 | mskz0)
+        /* align position */
         {
-            avx2_gather_current_pos += _tzcnt_u32(mskz0 | mskd0) / 4;
-            break;
+            const char *aligned_pos = avx2_gather_current_pos + ALIGN_PAD8(avx2_gather_current_pos);
+
+            while (avx2_gather_current_pos < aligned_pos && 
+                  *avx2_gather_current_pos != 0 && 
+                   avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos]) 
+            {
+                avx2_gather_current_pos++;
+            }
         }
-        avx2_gather_current_pos += 8;
+
+        if (*avx2_gather_current_pos != 0 && !avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos])
+        {
+            // TODO: unroll line to 64 byte fetch / parallel compuctation?
+            while (1)
+            {
+                __m128i xmm0 = _mm_cvtsi64_si128(*(uint64_t *)(avx2_gather_current_pos));
+                __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
+                __m256i ymm1 = _mm256_i32gather_epi32(avx2_gather_delimiters_table, ymm0, 4);
+                uint32_t mskz0 = _mm256_movemask_epi8(_mm256_cmpeq_epi32(ymm0, _mm256_setzero_si256()));
+                uint32_t mskd0 = ~_mm256_movemask_epi8(ymm1);
+                if (mskd0 | mskz0)
+                {
+                    avx2_gather_current_pos += _tzcnt_u32(mskz0 | mskd0) / 4;
+                    break;
+                }
+                avx2_gather_current_pos += 8;
+            }
+        }
     }
 
     // it is end
@@ -1222,31 +1341,42 @@ MSLIB_EXPORT char *ms_strtok_avx2_gather(char * __restrict__ str, const char * _
 
     char *token_start = avx2_gather_current_pos;
 
-    /* align position */
+    if (delimiters[1] == 0)
     {
-        const char *aligned_pos = avx2_gather_current_pos + ALIGN_PAD8(avx2_gather_current_pos);
-        
-        while (avx2_gather_current_pos < aligned_pos && 
-              *avx2_gather_current_pos != 0 && 
-               !avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos]) 
-        {
-            avx2_gather_current_pos++;
-        }
+        avx2_gather_current_pos = ms_strchr_ptr(avx2_gather_current_pos, *delimiters);
     }
-
-    // TODO: unroll line to 64 byte fetch / parallel compuctation?
-    while (1)
+    else
     {
-        __m128i xmm0 = _mm_loadu_si128((__m128i *)(avx2_gather_current_pos));
-        __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
-        __m256i ymm1 = _mm256_i32gather_epi32(avx2_gather_delimiters_table, ymm0, 4);
-        uint32_t msk0 = _mm256_movemask_epi8(ymm1);
-        if (msk0)
+        /* align position */
         {
-            avx2_gather_current_pos += _tzcnt_u32(msk0) / 4;
-            break;
+            const char *aligned_pos = avx2_gather_current_pos + ALIGN_PAD8(avx2_gather_current_pos);
+            
+            while (avx2_gather_current_pos < aligned_pos && 
+                  *avx2_gather_current_pos != 0 && 
+                   !avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos]) 
+            {
+                avx2_gather_current_pos++;
+            }
         }
-        avx2_gather_current_pos += 8;
+
+        if (*avx2_gather_current_pos != 0 && !avx2_gather_delimiters_table[(unsigned char)*avx2_gather_current_pos])
+        {
+            // TODO: unroll line to 64 byte fetch / parallel compuctation?
+            while (1)
+            {
+                __m128i xmm0 = _mm_cvtsi64_si128(*(uint64_t *)(avx2_gather_current_pos));
+                __m256i ymm0 = _mm256_cvtepu8_epi32(xmm0);
+                __m256i ymm1 = _mm256_i32gather_epi32(avx2_gather_delimiters_table, ymm0, 4);
+                uint32_t mskz0 = _mm256_movemask_epi8(_mm256_cmpeq_epi32(ymm0, _mm256_setzero_si256()));
+                uint32_t mskd0 = _mm256_movemask_epi8(ymm1);
+                if (mskd0 | mskz0)
+                {
+                    avx2_gather_current_pos += _tzcnt_u32(mskz0 | mskd0) / 4;
+                    break;
+                }
+                avx2_gather_current_pos += 8;
+            }
+        }
     }
 
     *avx2_gather_current_pos++ = 0;
@@ -1260,7 +1390,6 @@ MSLIB_EXPORT char *ms_strtok_avx2_gather(char * __restrict__ str, const char * _
 
 #ifdef FORCE_INLINE
     _Thread_local char *x64_current_pos = NULL;
-    _Thread_local const char *x64_prev_delimiters = NULL;
     _Thread_local uint8_t x64_delimiters_table[256];
 #endif
 MSLIB_EXPORT char *ms_strtok_x64(char * __restrict__ str, const char * __restrict__ delimiters)
@@ -1268,26 +1397,26 @@ MSLIB_EXPORT char *ms_strtok_x64(char * __restrict__ str, const char * __restric
 {    
     #ifndef FORCE_INLINE
         _Thread_local static char *x64_current_pos = NULL;
-        _Thread_local static const char *x64_prev_delimiters = NULL;
         _Thread_local static uint8_t x64_delimiters_table[256];
     #endif
 
-    if (x64_prev_delimiters != delimiters)
+    #ifndef STRTOK_DYNAMIC_DELIMITERS
+    if (str != NULL)
+    #endif
     {
         ms_memclear((char *)x64_delimiters_table, sizeof(x64_delimiters_table));
-        x64_prev_delimiters = delimiters;
+        const char *save = delimiters;
         while (*delimiters)
         {
             x64_delimiters_table[(unsigned char)*delimiters] = -1;
             delimiters++;
         }
-        delimiters = x64_prev_delimiters;
+        delimiters = save;
     }
-    
 
     if (str != NULL) 
     {
-        x64_current_pos = str;
+        x64_current_pos = str;    
     } 
     else if (x64_current_pos == NULL || *x64_current_pos == 0) 
     {
