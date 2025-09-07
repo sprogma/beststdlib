@@ -1571,40 +1571,41 @@ MSLIB_EXPORT const char *ms_strstr(const char * __restrict__ str, const char * _
 #endif
 
 
-MSLIB_EXPORT size_t ms_getline(char ** __restrict__ lineptr, size_t * __restrict__ count, FILE * __restrict__ file)
-#if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
-{
-    size_t alloc = 0;
-    if (*count <= 1)
-    {
-        free(*lineptr);
-        alloc = 16;
-        *lineptr = malloc(alloc);
-        *count = alloc;
-    }
-    size_t read = 0, add_read = 1;
-    while (add_read)
-    {
-        printf("Waiting...\n");
-        add_read = ms_size_fgets(*lineptr + read, *count - read, file);
-        printf("Read %d\n", (int)add_read);
-        read += add_read;
-        if (read + 1 == *count)
-        {
-            alloc <<= 1;
-            *lineptr = realloc(*lineptr, alloc);
-            *count = alloc;
-        }
-        else
-        {
-            break;
-        }
-    }
-    return *count;
-}
-#else
-;
-#endif
+// TODO: make getline function.
+// MSLIB_EXPORT size_t ms_getline(char ** __restrict__ lineptr, size_t * __restrict__ count, FILE * __restrict__ file)
+// #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
+// {
+//     size_t alloc = 0;
+//     if (*count <= 1)
+//     {
+//         free(*lineptr);
+//         alloc = 16;
+//         *lineptr = malloc(alloc);
+//         *count = alloc;
+//     }
+//     size_t read = 0, add_read = 1;
+//     while (add_read)
+//     {
+//         printf("Waiting...\n");
+//         add_read = ms_size_fgets(*lineptr + read, *count - read, file);
+//         printf("Read %d\n", (int)add_read);
+//         read += add_read;
+//         if (read + 1 == *count)
+//         {
+//             alloc <<= 1;
+//             *lineptr = realloc(*lineptr, alloc);
+//             *count = alloc;
+//         }
+//         else
+//         {
+//             break;
+//         }
+//     }
+//     return *count;
+// }
+// #else
+// ;
+// #endif
 
 
 #ifdef __cplusplus

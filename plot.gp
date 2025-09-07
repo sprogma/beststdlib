@@ -6,7 +6,7 @@ set datafile separator ";"
 set terminal pngcairo size 1200,700 enhanced font "Arial,14"
 set output "histogram.png"
 
-set title "function 'atoi' results"
+set title "function 'strcpy' results"
 set xlabel ""
 set ylabel "time (ms)"
 
@@ -27,7 +27,8 @@ set xtics rotate by -90
 # set xtic rotate by 0 scale 0
 
 plot 'data.csv' using 2:xtic(1) title columnheader(2), \
-                        ''         using 3        title columnheader(3),  
+                        ''         using 3        title columnheader(3), \
+                ''         using 4        title columnheader(4),  
 
 set key off
 set format y "%g"
