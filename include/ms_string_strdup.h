@@ -20,6 +20,10 @@ extern "C"
 MSLIB_EXPORT char *ms_strdup(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
     int size = ms_strlen(str) + 1;
     char *new_string = malloc(size);
     ms_memcpy(new_string, str, size);

@@ -15,7 +15,7 @@ extern "C"
 MSLIB_EXPORT size_t ms_size_fgets(char * __restrict__ str, size_t count, FILE * __restrict__ file)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
-    if (!count) return 0;
+    if (!count || str == NULL) return 0;
     char *str_start = str;
     int c;
     while (--count && (c = getc(file)) && c != EOF)

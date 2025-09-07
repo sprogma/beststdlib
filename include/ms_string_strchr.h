@@ -18,6 +18,11 @@ extern "C"
 MSLIB_EXPORT char *ms_strchr(const char *str, char ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     str = ms_strchr_ptr(str, ch);
     return (!*str && ch) ? NULL : (char *)str;
 }

@@ -25,6 +25,11 @@ extern "C"
 MSLIB_EXPORT void ms_memclear_avx2_d32(char *buf, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (buf == NULL)
+    {
+        return;
+    }
+
     const char *buf_aligned = buf + ALIGN_PAD32(buf);
     while (buf < buf_aligned && *buf)
     {
@@ -60,6 +65,11 @@ MSLIB_EXPORT void ms_memclear_avx2_d32(char *buf, size_t size)
 MSLIB_EXPORT void ms_memclear_avx2_d64(char *buf, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (buf == NULL)
+    {
+        return;
+    }
+
     const char *buf_aligned = buf + ALIGN_PAD64(buf);
     while (buf < buf_aligned && *buf)
     {
@@ -97,6 +107,11 @@ MSLIB_EXPORT void ms_memclear_avx2_d64(char *buf, size_t size)
 MSLIB_EXPORT void ms_memclear_x64(char *buf, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (buf == NULL)
+    {
+        return;
+    }
+
     while (size)
     {
     //TODO: Add here duff's device ?

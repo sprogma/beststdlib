@@ -23,6 +23,11 @@ extern "C"
 MSLIB_EXPORT int ms_puts_win(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return 0;
+    }
+
     size_t size = ms_strlen(str);
 
     HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -39,6 +44,11 @@ MSLIB_EXPORT int ms_puts_win(const char *str)
 MSLIB_EXPORT int ms_puts_any(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return 0;
+    }
+
     size_t size = ms_strlen(str);
 
     return fwrite(str, size, 1, stdout) != size;

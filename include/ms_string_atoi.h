@@ -21,6 +21,11 @@ extern "C"
 MSLIB_EXPORT int ms_atoi(char *number)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (number == NULL)
+    {
+        return 0;
+    }
+    
     char *start = next_nonwhitespace(number);
     int res = 0, neg = 0;
     if (*start == '+')

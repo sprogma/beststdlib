@@ -25,6 +25,11 @@ extern "C"
 MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d32(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+    
     const char *str_aligned = str + ALIGN_PAD32(str);
 
     while (str < str_aligned && *str && *str == ch)
@@ -60,6 +65,11 @@ MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d32(const char *str, int ch)
 MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d64(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     const char *str_aligned = str + ALIGN_PAD64(str);
 
     while (str < str_aligned && *str && *str == ch)
@@ -99,6 +109,11 @@ MSLIB_EXPORT char *ms_inv_strchr_ptr_avx2_d64(const char *str, int ch)
 MSLIB_EXPORT char *ms_inv_strchr_ptr_x64(const char *str, int ch)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     while (*str && *str == ch)
     {
         str++;

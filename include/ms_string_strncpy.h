@@ -21,6 +21,11 @@ extern "C"
 MSLIB_EXPORT char *ms_strncpy_avx2_d32(char * __restrict__ dest, const char * __restrict__ src, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (dest == NULL || src == NULL)
+    {
+        return NULL;
+    }
+
     char *dest_start = dest;
 
     const char *src_aligned = src + ALIGN_PAD32(src);
@@ -78,6 +83,11 @@ MSLIB_EXPORT char *ms_strncpy_avx2_d32(char * __restrict__ dest, const char * __
 MSLIB_EXPORT char *ms_strncpy_avx_d64(char * __restrict__ dest, const char * __restrict__ src, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (dest == NULL || src == NULL)
+    {
+        return NULL;
+    }
+
     char *dest_start = dest;
 
     const char *src_aligned = src + ALIGN_PAD64(src);
@@ -137,6 +147,11 @@ MSLIB_EXPORT char *ms_strncpy_avx_d64(char * __restrict__ dest, const char * __r
 MSLIB_EXPORT char *ms_strncpy_x64(char * __restrict__ dest, const char * __restrict__ src, size_t size)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (dest == NULL || src == NULL)
+    {
+        return NULL;
+    }
+
     char *dest_start = dest;
 
     while (*src && size)

@@ -21,6 +21,11 @@ extern "C"
 MSLIB_EXPORT char *ms_strcat(char * __restrict__ dest, const char * __restrict__ src)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (dest == NULL || src == NULL)
+    {
+        return NULL;
+    }
+
     ms_strcpy(ms_strend(dest), src);
     return dest;
 }

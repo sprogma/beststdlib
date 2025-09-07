@@ -26,6 +26,11 @@ extern "C"
 MSLIB_EXPORT char *next_nonwhitespace_avx2_d32(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     const char *dest_aligned = str + ALIGN_PAD32(str);
 
     /* 32 is ' ' code, and all isspace chars is less than 32,
@@ -61,6 +66,11 @@ MSLIB_EXPORT char *next_nonwhitespace_avx2_d32(const char *str)
 MSLIB_EXPORT char *next_nonwhitespace_avx2_d64(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     const char *dest_aligned = str + ALIGN_PAD64(str);
 
     /* 32 is ' ' code, and all isspace chars is less than 32,
@@ -101,6 +111,11 @@ MSLIB_EXPORT char *next_nonwhitespace_avx2_d64(const char *str)
 MSLIB_EXPORT char *next_nonwhitespace_x64(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     while (*str && *str <= ' ')
     {
         str++;

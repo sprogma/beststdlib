@@ -20,6 +20,10 @@ extern "C"
 MSLIB_EXPORT size_t ms_strlen(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return 0;
+    }
     return ms_strend(str) - str;
 }
 #else

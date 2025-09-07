@@ -1,0 +1,3 @@
+gcc (bench.c/main.c) -o a.exe -Iinclude [-O3] [-g] [-march=native] [-DFORCE_INLINE]
+// -march=native -> avx usage
+// -DFORCE_INLINE -> add forceinline flags on almost all functions

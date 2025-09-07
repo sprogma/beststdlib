@@ -28,6 +28,11 @@ extern "C"
 MSLIB_EXPORT char *ms_strend_avx2_d32(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     const char *dest_aligned = str + ALIGN_PAD32(str);
 
     while (str < dest_aligned && *str)
@@ -61,6 +66,11 @@ MSLIB_EXPORT char *ms_strend_avx2_d32(const char *str)
 MSLIB_EXPORT char *ms_strend_avx2_d64(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     const char *dest_aligned = str + ALIGN_PAD64(str);
 
     while (str < dest_aligned && *str)
@@ -97,6 +107,11 @@ MSLIB_EXPORT char *ms_strend_avx2_d64(const char *str)
 MSLIB_EXPORT char *ms_strend_x64(const char *str)
 #if defined(ADD_SOURCE_CODE) || defined(FORCE_INLINE)
 {
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
     while (*str)
     {
     //TODO: Add here duff's device ?
