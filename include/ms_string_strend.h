@@ -49,9 +49,10 @@ MSLIB_EXPORT char *ms_strend_avx2_d32(const char *str)
     while (1)
     {
         __m256i ymm0 = _mm256_loadu_si256((__m256i *)(str +  0));
-        uint32_t msk0 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256()));
-        if (msk0)
+        __m256i ymm1 = _mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256());
+        if (!_mm256_testz_si256(ymm1, ymm1))
         {
+            uint32_t msk0 = _mm256_movemask_epi8(ymm1);
             return (char *)str + _tzcnt_u32((size_t)msk0);
         }
         str += 32;
@@ -88,10 +89,12 @@ MSLIB_EXPORT char *ms_strend_avx2_d64(const char *str)
     {
         __m256i ymm0 = _mm256_loadu_si256((__m256i *)(str +  0));
         __m256i ymm1 = _mm256_loadu_si256((__m256i *)(str + 32));
-        uint32_t msk0 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256()));
-        uint32_t msk1 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm1, _mm256_setzero_si256()));
-        if (msk0 | msk1)
+        __m256i ymm2 = _mm256_cmpeq_epi8(ymm0, _mm256_setzero_si256());
+        __m256i ymm3 = _mm256_cmpeq_epi8(ymm1, _mm256_setzero_si256());
+        if (!(_mm256_testz_si256(ymm2, ymm2) & _mm256_testz_si256(ymm3, ymm3)))
         {
+            uint32_t msk0 = _mm256_movemask_epi8(ymm2);
+            uint32_t msk1 = _mm256_movemask_epi8(ymm3);
             return (char *)str + _tzcnt_u64((size_t)msk0 | ((size_t)msk1 << 32ull));
         }
         str += 64;
