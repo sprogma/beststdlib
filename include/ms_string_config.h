@@ -1,12 +1,5 @@
-#ifndef MSLIB_STRING_COMMON
-#define MSLIB_STRING_COMMON
-
-
-#include "inttypes.h"
-#include "errno.h"
-#include "limits.h"
-#include "stdio.h"
-#include "immintrin.h"
+#ifndef MSLIB_STRING_CONFIG
+#define MSLIB_STRING_CONFIG
 
 
 #define ADD_SOURCE_CODE
@@ -41,15 +34,5 @@
     gc ms_string.h | sls "MSLIB_EXPORT.*?ms"
 */
 
-
-#define ALIGN_PAD8(buf)  (( 8 - (size_t)(buf) %  8) % 8 )
-#define ALIGN_PAD32(buf) ((32 - (size_t)(buf) % 32) % 32)
-#define ALIGN_PAD64(buf) ((64 - (size_t)(buf) % 64) % 64)
-
-#ifdef FORCE_INLINE
-    #define MSLIB_EXPORT static __attribute__((always_inline)) __inline__
-#else
-    #define MSLIB_EXPORT static inline
-#endif
 
 #endif
