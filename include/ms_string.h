@@ -1,3 +1,5 @@
+#ifndef MS_STRING
+#define MS_STRING
 #include "ms_string_atoi.h"
 #include "ms_string_fgets.h"
 #include "ms_string_inv_strchr_ptr.h"
@@ -16,3 +18,6 @@
 #include "ms_string_strncat.h"
 #include "ms_string_strncpy.h"
 #include "ms_string_strtok.h"
+
+
+#endif

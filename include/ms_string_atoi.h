@@ -4,10 +4,6 @@
 
 #include "ms_string_common_headers.h"
 
-#ifdef WIN32
-    #include "windows.h"
-#endif
-
 #include "ms_string_next_nonwhitespace.h"
 
 
