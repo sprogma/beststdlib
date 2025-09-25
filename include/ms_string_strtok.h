@@ -2,7 +2,7 @@
 #define MSLIB_STRING_STRTOK
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 #ifdef __AVX2__
     #include "ms_string_strchr_ptr.h"

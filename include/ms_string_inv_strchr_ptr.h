@@ -2,7 +2,7 @@
 #define MSLIB_STRING_INV_STRCHR_PTR
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 
 

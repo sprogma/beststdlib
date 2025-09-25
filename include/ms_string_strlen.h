@@ -2,7 +2,7 @@
 #define MSLIB_STRING_STRLEN
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 #include "ms_string_strend.h"
 

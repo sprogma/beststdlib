@@ -2,7 +2,7 @@
 #define MSLIB_STRING_ATOI
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 #ifdef WIN32
     #include "windows.h"

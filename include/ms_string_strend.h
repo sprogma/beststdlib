@@ -2,7 +2,7 @@
 #define MSLIB_STRING_STREND
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 
 #ifdef __cplusplus

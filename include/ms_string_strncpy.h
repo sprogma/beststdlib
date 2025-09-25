@@ -2,7 +2,7 @@
 #define MSLIB_STRING_STRNCPY
 
 
-#include "ms_string_common.h"
+#include "ms_string_common_headers.h"
 
 #include "ms_string_memclear.h"
 
